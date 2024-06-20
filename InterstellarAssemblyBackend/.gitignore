@@ -130,3 +130,4 @@ dist
 .pnp.*
 
 application-prod.properties
+application-test.properties
