@@ -8,26 +8,20 @@ import com.qly.mallchat.common.user.dao.UserDao;
 import com.qly.mallchat.common.user.domain.entity.User;
 import com.qly.mallchat.common.user.service.LoginService;
 import com.qly.mallchat.common.websocket.domain.dto.WSChannelExtraDTO;
-import com.qly.mallchat.common.websocket.domain.enums.WSRespTypeEnum;
-import com.qly.mallchat.common.websocket.domain.vo.req.WSBaseReq;
 import com.qly.mallchat.common.websocket.domain.vo.resp.WSBaseResp;
-import com.qly.mallchat.common.websocket.domain.vo.resp.WSLoginUrl;
 import com.qly.mallchat.common.websocket.service.WebSocketService;
 import com.qly.mallchat.common.websocket.service.adapter.WebSocketAdapter;
 import io.netty.channel.Channel;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
-import io.swagger.models.auth.In;
 import lombok.SneakyThrows;
 import me.chanjar.weixin.mp.api.WxMpService;
 import me.chanjar.weixin.mp.bean.result.WxMpQrCodeTicket;
-import org.checkerframework.checker.units.qual.A;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.Objects;
-import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 
 
@@ -92,7 +86,7 @@ public class WebSocketServiceImpl implements WebSocketService {
         //调用登录模块获取token
         String token =loginService.login(uid);
         //登录
-        sendMsg(channel,WebSocketAdapter.buildResp(user,token));
+        loginSuccess(channel,user,token);
     }
 
     @Override
@@ -102,6 +96,27 @@ public class WebSocketServiceImpl implements WebSocketService {
             return;
         }
         sendMsg(channel,WebSocketAdapter.buildWaitAuthorizeResp());
+    }
+
+    @Override
+    public void authorize(Channel channel, String token) {
+        Long validUid = loginService.getValidUid(token);
+        if(Objects.nonNull(validUid)){
+            User user = userDao.getById(validUid);
+            loginSuccess(channel,user,token);
+
+        }else{
+            sendMsg(channel,WebSocketAdapter.buildInvalidTokenResp());
+        }
+    }
+
+    private void loginSuccess(Channel channel, User user, String token) {
+        //保存channel的对应uid
+        WSChannelExtraDTO wsChannelExtraDTO = ONLINE_WS_MAP.get(channel);
+        wsChannelExtraDTO.setUid(user.getId());
+        //todo 用户上线成功的一些事件
+        //推送登录成功的消息
+        sendMsg(channel,WebSocketAdapter.buildResp(user,token));
     }
 
     private void sendMsg(Channel channel, WSBaseResp<?> resp) {
