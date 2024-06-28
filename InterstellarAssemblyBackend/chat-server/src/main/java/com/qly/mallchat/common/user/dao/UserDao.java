@@ -1,5 +1,6 @@
 package com.qly.mallchat.common.user.dao;
 
+import com.qly.mallchat.common.common.domain.enums.YesOrNoEnum;
 import com.qly.mallchat.common.user.domain.entity.User;
 import com.qly.mallchat.common.user.mapper.UserMapper;
 import com.qly.mallchat.common.user.service.UserService;
@@ -36,6 +37,13 @@ public class UserDao extends ServiceImpl<UserMapper, User> {
         lambdaUpdate()
                 .eq(User::getId,uid)
                 .eq(User::getItemId,itemId)
+                .update();
+    }
+
+    public void invalidUid(Long id) {
+        lambdaUpdate()
+                .eq(User::getId,id)
+                .set(User::getStatus, YesOrNoEnum.YES.getStatus())
                 .update();
     }
 }

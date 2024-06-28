@@ -2,6 +2,7 @@ package com.qly.mallchat.common.user.service;
 
 import com.qly.mallchat.common.user.domain.entity.User;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.qly.mallchat.common.user.domain.vo.req.BlackReq;
 import com.qly.mallchat.common.user.domain.vo.resp.BadgeResp;
 import com.qly.mallchat.common.user.domain.vo.resp.UserInfoResp;
 
@@ -26,4 +27,6 @@ public interface UserService {
     List<BadgeResp> badges(Long uid);
 
     void wearingBadge(Long uid, Long itemId);
+
+    void black(BlackReq req);
 }

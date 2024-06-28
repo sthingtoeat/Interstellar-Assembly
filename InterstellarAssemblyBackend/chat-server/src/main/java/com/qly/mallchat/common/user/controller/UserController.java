@@ -3,11 +3,15 @@ package com.qly.mallchat.common.user.controller;
 
 import cn.hutool.system.UserInfo;
 import com.qly.mallchat.common.common.domain.vo.resp.ApiResult;
+import com.qly.mallchat.common.common.utils.AssertUtil;
 import com.qly.mallchat.common.common.utils.RequestHolder;
+import com.qly.mallchat.common.user.domain.enums.RoleEnum;
+import com.qly.mallchat.common.user.domain.vo.req.BlackReq;
 import com.qly.mallchat.common.user.domain.vo.req.ModifyNameReq;
 import com.qly.mallchat.common.user.domain.vo.req.WearingBadgeReq;
 import com.qly.mallchat.common.user.domain.vo.resp.BadgeResp;
 import com.qly.mallchat.common.user.domain.vo.resp.UserInfoResp;
+import com.qly.mallchat.common.user.service.IRoleService;
 import com.qly.mallchat.common.user.service.UserService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -34,6 +38,8 @@ import java.util.List;
 public class UserController {
     @Autowired
     private UserService userService;
+    @Autowired
+    private IRoleService iRoleService;
     @GetMapping("/userInfo")
     @ApiOperation("获取用户个人信息")
     public ApiResult<UserInfoResp> getUserInfo(){
@@ -57,6 +63,16 @@ public class UserController {
     @ApiOperation("佩戴徽章")
     public ApiResult<Void> wearingBadge(@Valid @RequestBody WearingBadgeReq req){
         userService.wearingBadge(RequestHolder.get().getUid(),req.getItemId());
+        return ApiResult.success();
+    }
+
+    @PutMapping("/black")
+    @ApiOperation("拉黑用户")
+    public ApiResult<Void> black(@Valid @RequestBody BlackReq req){
+        Long uid = RequestHolder.get().getUid();
+        boolean hasPower = iRoleService.hasPower(uid , RoleEnum.ADMIN);
+        AssertUtil.isTrue(hasPower , "管理员没有权限");
+        userService.black(req);
         return ApiResult.success();
     }
 }

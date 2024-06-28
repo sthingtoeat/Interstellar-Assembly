@@ -1,24 +1,32 @@
 package com.qly.mallchat.common.user.service.impl;
 
+import com.qly.mallchat.common.common.annotation.RedissonLock;
+import com.qly.mallchat.common.common.event.UserBlackEvent;
+import com.qly.mallchat.common.common.event.UserRegisterEvent;
 import com.qly.mallchat.common.common.utils.AssertUtil;
+import com.qly.mallchat.common.user.dao.BlackDao;
 import com.qly.mallchat.common.user.dao.ItemConfigDao;
 import com.qly.mallchat.common.user.dao.UserBackpackDao;
 import com.qly.mallchat.common.user.dao.UserDao;
-import com.qly.mallchat.common.user.domain.entity.ItemConfig;
-import com.qly.mallchat.common.user.domain.entity.User;
-import com.qly.mallchat.common.user.domain.entity.UserBackpack;
+import com.qly.mallchat.common.user.domain.entity.*;
+import com.qly.mallchat.common.user.domain.enums.BlackTypeEnum;
 import com.qly.mallchat.common.user.domain.enums.ItemEnum;
 import com.qly.mallchat.common.user.domain.enums.ItemTypeEnum;
+import com.qly.mallchat.common.user.domain.vo.req.BlackReq;
 import com.qly.mallchat.common.user.domain.vo.resp.BadgeResp;
 import com.qly.mallchat.common.user.domain.vo.resp.UserInfoResp;
 import com.qly.mallchat.common.user.service.UserService;
 import com.qly.mallchat.common.user.service.adapter.UserAdapter;
 import com.qly.mallchat.common.user.service.cache.ItemCache;
+import io.micrometer.core.instrument.util.StringUtils;
+import jodd.util.StringUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -31,12 +39,17 @@ public class UserServiceImpl implements UserService {
     private ItemCache itemCache;
     @Autowired
     private ItemConfigDao itemConfigDao;
+    @Autowired
+    private ApplicationEventPublisher applicationEventPublisher;
+    @Autowired
+    private BlackDao blackDao;
     @Override
     @Transactional
     public Long register(User insert) {
         boolean save = userDao.save(insert);
-        //todo 用户的注册事件
-        userDao.save(insert);
+        //注册完以后发放改名卡
+        //用户的注册事件
+        applicationEventPublisher.publishEvent(new UserRegisterEvent(this, insert));
         return insert.getId();
     }
 
@@ -49,6 +62,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @RedissonLock(key = "#uid")
     public void modifyName(Long uid, String name) {
         User oldUser = userDao.getByName(name);
         AssertUtil.isEmpty(oldUser,"名称重复，请重新输入！");
@@ -82,5 +96,33 @@ public class UserServiceImpl implements UserService {
         ItemConfig itemConfig = itemConfigDao.getById(firstValidItem.getItemId());
         AssertUtil.equal(itemConfig.getType(),ItemTypeEnum.BADGE.getType(),"只有徽章才能佩戴");
         userDao.wearingBadge(uid,itemId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void black(BlackReq req) {
+        Long uid = req.getUid();
+        Black user = new Black();
+        user.setType(BlackTypeEnum.UID.getType());
+        blackDao.save(user);
+        User byId = userDao.getById(uid);
+        blackIp(Optional.ofNullable(byId.getIpInfo()).map(IpInfo::getCreateIp).orElse(null));
+        blackIp(Optional.ofNullable(byId.getIpInfo()).map(IpInfo::getUpdateIp).orElse(null));
+        applicationEventPublisher.publishEvent(new UserBlackEvent(this,byId));
+    }
+
+    private void blackIp(String ip) {
+        if(StringUtils.isBlank(ip)){
+            return;
+        }
+        try {
+            Black insert = new Black();
+            insert.setType(BlackTypeEnum.IP.getType());
+            insert.setTarget(ip);
+            blackDao.save(insert);
+        }catch (Exception e){
+
+        }
+
     }
 }
